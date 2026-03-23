@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Para Thani ❤️</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#050505; overflow:hidden;
+  display:flex; justify-content:center; align-items:center;
+  height:100vh; font-family:Arial,sans-serif;
+}
+
+#overlay {
+  position:fixed; inset:0;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  gap:32px; z-index:20;
+  transition: opacity 0.9s ease;
+  pointer-events:all;
+}
+#overlay.hidden { opacity:0; pointer-events:none; }
+
+.sub {
+  font-family:Arial,sans-serif;
+  font-size:clamp(.75rem,2.8vw,1rem);
+  color:rgba(255,150,185,.6);
+  letter-spacing:.42em; text-transform:uppercase;
+  text-shadow:0 0 18px rgba(255,50,100,.5);
+  animation:fl 3.2s ease-in-out infinite alternate;
+  text-align:center; padding:0 20px;
+}
+@keyframes fl{
+  from{opacity:.3;transform:translateY(3px)}
+  to  {opacity:.8;transform:translateY(-6px)}
+}
+
+#btn-iniciar {
+  padding:16px 56px;
+  font-size:clamp(.95rem,3.8vw,1.2rem);
+  background:rgba(0,0,0,.45);
+  color:#ff3366;
+  border:2px solid #ff3366;
+  border-radius:50px; cursor:pointer;
+  transition:all .3s ease;
+  box-shadow:0 0 18px rgba(255,51,102,.55), 0 0 40px rgba(255,51,102,.2);
+  text-transform:uppercase; letter-spacing:.2em;
+  position:relative; z-index:21;
+  animation:btnp 2.6s ease-in-out infinite;
+  -webkit-tap-highlight-color:transparent;
+}
+#btn-iniciar:hover, #btn-iniciar:active {
+  color:#fff; background:#ff3366;
+  box-shadow:0 0 35px rgba(255,51,102,.9),0 0 70px rgba(255,51,102,.5);
+  transform:scale(1.06);
+}
+@keyframes btnp{
+  0%,100%{box-shadow:0 0 18px rgba(255,51,102,.55),0 0 40px rgba(255,51,102,.2)}
+  50%    {box-shadow:0 0 30px rgba(255,51,102,.8), 0 0 65px rgba(255,51,102,.4)}
+}
+
+canvas { filter:drop-shadow(0 0 5px rgba(255,51,102,.3)); }
+</style>
+</head>
+<body>
+
+<audio id="mus" loop>
+  <source src="https://www.dropbox.com/scl/fi/oz1xjitb9yfb8mevvie7y/La-Promesa-Melendi-Lyrics-video-w8SOcXfnQ_8.m4a?rlkey=6hrnzlnnuj1adey8vrqwpzpb3&st=8x7ssiqb&raw=1" type="audio/mp4">
+</audio>
+
+<div id="overlay">
+  <div class="sub">✦ una sorpresa para ti ✦</div>
+  <button id="btn-iniciar">INICIAR ♥</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  CONFIGURACIÓN
+// ═══════════════════════════════════════════════════════════
+const WORDS = [
+  'Mi Tania',
+  'Preciosa',
+  'Te Extraño',
+  'Mi Amor',
+  'Gracias',
+  'Por Existir',
+  'Mi Niña',
+  'Te Amo',
+];
+
+// Frases que caerán al final
+const FINAL_PHRASES = [
+  "Eres mi persona favorita",
+  "Me haces muy feliz",
+  "Mi refugio",
+  "Te adoro",
+  "Mi universo entero",
+  "Gracias por tanto",
+  "Eres arte",
+  "Siempre en mi mente",
+  "Me encantas"
+];
+
+const WORD_DURATION  = 4000;  
+const NUM_PARTICLES  = 1500;  
+const HEART_LAYERS   = 5;
+const NUM_BG_HEARTS  = 25;   
+const NUM_FALLING_PHRASES = 12; // Cantidad de frases cayendo simultáneamente
+
+// ═══════════════════════════════════════════════════════════
+//  VARIABLES GLOBALES
+// ═══════════════════════════════════════════════════════════
+let particles   = [];
+let starfield   = [];
+let bgHearts    = [];   
+let fallingPhrases = []; // Nuevo array para las frases
+let wordPoints  = [];   
+let heartPoints = [];   
+let state       = 'floating';
+let wordIndex   = 0;
+let wordTimer   = 0;
+let started     = false;
+
+// ═══════════════════════════════════════════════════════════
+//  P5 SETUP
+// ═══════════════════════════════════════════════════════════
+function setup() {
+  let cnv = createCanvas(windowWidth, windowHeight);
+  cnv.style('position', 'fixed');
+  cnv.style('top', '0');
+  cnv.style('left', '0');
+
+  colorMode(HSB, 360, 100, 100, 100);
+  textAlign(CENTER, CENTER);
+
+  for (let i = 0; i < 350; i++) {
+    starfield.push({
+      x: random(width), y: random(height),
+      r: random(0.4, 1.8),
+      a: random(15, 55),
+      ph: random(TWO_PI),
+      sp: random(0.008, 0.025),
+    });
+  }
+
+  for (let i = 0; i < NUM_BG_HEARTS; i++) {
+    bgHearts.push(new FloatingHeart());
+  }
+
+  for (let i = 0; i < NUM_PARTICLES; i++) {
+    particles.push(new Particle());
+  }
+
+  // Inicializar las frases que caen
+  for (let i = 0; i < NUM_FALLING_PHRASES; i++) {
+    fallingPhrases.push(new FallingPhrase());
+  }
+
+  computeWordPoints();
+  heartPoints = buildMultiLayerHeart(NUM_PARTICLES);
+
+  document.getElementById('btn-iniciar').addEventListener('click', startAnim);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FUNCIONES DE AYUDA
+// ═══════════════════════════════════════════════════════════
+function drawHeart(x, y, size) {
+  beginShape();
+  for (let a = 0; a < TWO_PI; a += 0.1) {
+    let hx = size * (16 * pow(sin(a), 3));
+    let hy = -size * (13 * cos(a) - 5 * cos(2 * a) - 2 * cos(3 * a) - cos(4 * a));
+    vertex(x + hx, y + hy);
+  }
+  endShape(CLOSE);
+}
+
+function generateTextPoints(text, targetFs) {
+  const SIZE = 800;
+  const ofc  = document.createElement('canvas');
+  ofc.width  = SIZE; ofc.height = SIZE;
+  const oc   = ofc.getContext('2d', { willReadFrequently: true });
+  oc.clearRect(0,0,SIZE,SIZE);
+  oc.fillStyle = '#fff';
+  oc.textAlign = 'center'; oc.textBaseline = 'middle';
+  
+  let fs2 = 140;
+  oc.font = `bold ${fs2}px sans-serif`;
+  while (oc.measureText(text).width > SIZE*0.85 && fs2 > 20) {
+    fs2 -= 4; oc.font = `bold ${fs2}px sans-serif`;
+  }
+  oc.fillText(text, SIZE/2, SIZE/2);
+
+  let data;
+  try { data = oc.getImageData(0,0,SIZE,SIZE).data; }
+  catch(e) { return []; }
+
+  const raw = [];
+  for(let y=0; y<SIZE; y+=3) {
+    for(let x=0; x<SIZE; x+=3) {
+      if(data[(y*SIZE+x)*4+3] > 128) { 
+        raw.push({ 
+          x: (x-SIZE/2) * ((targetFs*6)/SIZE), 
+          y: (y-SIZE/2) * ((targetFs*6)/SIZE) 
+        });
+      }
+    }
+  }
+  return raw;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CLASE: FRASES CAYENDO (NUEVO)
+// ═══════════════════════════════════════════════════════════
+class FallingPhrase {
+  constructor() {
+    this.reset();
+    // Distribuirlas para que no caigan todas a la vez al principio
+    this.y = random(-height * 1.5, 0); 
+  }
+
+  reset() {
+    this.text = random(FINAL_PHRASES);
+    this.x = random(width * 0.1, width * 0.9);
+    this.y = random(-200, -50);
+    this.vel = random(0.6, 1.5); // Caen lento
+    this.size = random(12, 20); // Tamaños variados
+    this.alpha = random(40, 80); // Opacidad suave
+  }
+
+  update() {
+    this.y += this.vel;
+    if (this.y > height + 50) {
+      this.reset();
+    }
+  }
+
+  show() {
+    push();
+    fill(345, 60, 100, this.alpha);
+    textSize(this.size);
+    textStyle(ITALIC);
+    text(this.text, this.x, this.y);
+    pop();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CLASE: CORAZÓN FLOTANTE DE FONDO
+// ═══════════════════════════════════════════════════════════
+class FloatingHeart {
+  constructor() {
+    this.respawn();
+    this.pos.y = random(height);
+  }
+
+  respawn() {
+    this.pos = createVector(random(width), height + random(50, 200));
+    this.vel = createVector(random(2.0, 4.0), random(-0.8, -1.5)); 
+    this.size = random(3, 8); 
+    this.hue = random(330, 360); 
+    this.sat = random(50, 70); 
+    this.alpha = random(10, 25); 
+    this.rot = random(TWO_PI);
+    this.rotSpd = random(-0.02, 0.02);
+  }
+
+  update() {
+    this.pos.add(this.vel);
+    this.rot += this.rotSpd;
+    if (this.pos.y < -50) {
+      this.respawn();
+    }
+  }
+
+  show() {
+    push();
+    translate(this.pos.x, this.pos.y);
+    rotate(this.rot);
+    fill(this.hue, this.sat, 100, this.alpha);
+    noStroke();
+    drawHeart(0, 0, this.size / 10); 
+    pop();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  OTRAS FUNCIONES DEL NÚCLEO
+// ═══════════════════════════════════════════════════════════
+function computeWordPoints() {
+  wordPoints = [];
+  const fs = constrain(min(width, height) * 0.12, 40, 110);
+  for (let word of WORDS) {
+    wordPoints.push(generateTextPoints(word, fs));
+  }
+}
+
+function buildMultiLayerHeart(n) {
+  const pts = [];
+  const baseScale = min(width, height) * 0.022;
+  for (let layer = 1; layer <= HEART_LAYERS; layer++) {
+    const sc = baseScale * (layer / HEART_LAYERS);
+    const ptsInLayer = Math.floor(n / HEART_LAYERS);
+    for (let i = 0; i < ptsInLayer; i++) {
+      const t = map(i, 0, ptsInLayer, 0, TWO_PI);
+      const x = 16 * pow(sin(t), 3);
+      const y = 13*cos(t) - 5*cos(2*t) - 2*cos(3*t) - cos(4*t);
+      const jitter = random(-0.3, 0.3);
+      pts.push({
+        x: (x * (sc + jitter)),
+        y: (-y * (sc + jitter)),
+        layer: layer,
+      });
+    }
+  }
+  while (pts.length < n) {
+    const p = pts[floor(random(pts.length))];
+    pts.push({ x: p.x + random(-2,2), y: p.y + random(-2,2), layer: p.layer });
+  }
+  return pts;
+}
+
+function assignTargets(pts) {
+  if (!pts || pts.length === 0) return;
+  const len = pts.length;
+  const shuffled = [...pts].sort(() => random(-1,1));
+  for (let i = 0; i < particles.length; i++) {
+    const p = shuffled[i % len];
+    particles[i].setTarget(p.x + width/2, p.y + height/2);
+  }
+}
+
+function startAnim() {
+  if (started) return;
+  started = true;
+  const ov = document.getElementById('overlay');
+  ov.classList.add('hidden');
+  setTimeout(() => ov.remove(), 1000);
+  const mus = document.getElementById('mus');
+  mus.volume = 0.72;
+  mus.play().catch(() => {
+    document.addEventListener('touchstart', () => mus.play(), { once: true });
+  });
+  state     = 'words';
+  wordIndex = 0;
+  wordTimer = millis();
+  assignTargets(wordPoints[0]);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  P5 DRAW
+// ═══════════════════════════════════════════════════════════
+function draw() {
+  background(0, 0, 4, 28);
+
+  // 1. Capa profunda: Estrellas
+  noStroke();
+  for (const s of starfield) {
+    const tw = 0.4 + 0.6 * abs(sin(frameCount * s.sp + s.ph));
+    fill(0, 0, 100, s.a * tw);
+    ellipse(s.x, s.y, s.r * 2);
+  }
+
+  // 2. Capa intermedia: Nebulosa y Corazones
+  drawNebula();
+  for (const h of bgHearts) {
+    h.update();
+    h.show();
+  }
+
+  // 3. Capa principal de partículas
+  if (state === 'words') {
+    if (millis() - wordTimer > WORD_DURATION) {
+      wordIndex++;
+      if (wordIndex < WORDS.length) {
+        wordTimer = millis();
+        assignTargets(wordPoints[wordIndex]);
+      } else {
+        state = 'heart';
+        assignTargets(heartPoints);
+      }
+    }
+  }
+
+  for (const p of particles) {
+    if (state === 'floating') p.updateFloat();
+    else if (state === 'words') p.updateSeek();
+    else p.updateHeart();
+    p.show();
+  }
+
+  // 4. Capa final: Frases cayendo (Solo aparecen cuando se forma el corazón)
+  if (state === 'heart') {
+    for (const fp of fallingPhrases) {
+      fp.update();
+      fp.show();
+    }
+  }
+}
+
+function drawNebula() {
+  push();
+  noStroke();
+  for (let r = min(width,height)*0.45; r > 0; r -= 18) {
+    const a = map(r, 0, min(width,height)*0.45, 5, 0);
+    fill(340, 70, 50, a);
+    ellipse(width/2, height/2, r*2, r*2);
+  }
+  pop();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CLASE: PARTÍCULA PRINCIPAL
+// ═══════════════════════════════════════════════════════════
+class Particle {
+  constructor() {
+    this.pos    = createVector(random(width), random(height));
+    this.vel    = p5.Vector.random2D().mult(random(0.3, 1.4));
+    this.acc    = createVector();
+    this.target = createVector(random(width), random(height));
+    this.size   = random(2, 4); 
+    this.hue    = random(340, 360);
+    this.sat    = random(55, 75);
+    this.bri    = 100;
+    this.maxSpd = 14;
+    this.maxFrc = 1.8;
+  }
+
+  setTarget(x, y) {
+    this.target.set(x, y);
+  }
+
+  updateFloat() {
+    this.pos.add(this.vel);
+    if (this.pos.x < 0 || this.pos.x > width)  this.vel.x *= -1;
+    if (this.pos.y < 0 || this.pos.y > height) this.vel.y *= -1;
+    this.sat = 60;
+  }
+
+  updateSeek() {
+    this.sat = 100;
+    this._seek(this.target, this.maxSpd, this.maxFrc);
+  }
+
+  updateHeart() {
+    const pulse  = map(sin(frameCount * 0.07), -1, 1, 0.93, 1.07);
+    const center = createVector(width/2, height/2);
+    const dir    = p5.Vector.sub(this.target, center).mult(pulse);
+    const pulsed = p5.Vector.add(center, dir);
+    this._seek(pulsed, this.maxSpd * 1.1, this.maxFrc * 1.4);
+
+    this.hue = map(sin(frameCount * 0.05), -1, 1, 335, 360);
+    this.sat = 100;
+  }
+
+  _seek(target, spd, frc) {
+    const desired = p5.Vector.sub(target, this.pos);
+    const dist    = desired.mag();
+    desired.setMag(dist < 60 ? map(dist, 0, 60, 0, spd) : spd);
+    const steer = p5.Vector.sub(desired, this.vel).limit(frc);
+    this.acc.add(steer);
+    this.vel.add(this.acc);
+    this.pos.add(this.vel);
+    this.acc.mult(0);
+  }
+
+  show() {
+    noStroke();
+    const flicker = random(80, 100);
+    fill(this.hue, this.sat, this.bri, flicker);
+    ellipse(this.pos.x, this.pos.y, this.size * 0.8);
+
+    if (state !== 'floating') {
+      fill(this.hue, this.sat * 0.9, this.bri, flicker * 0.06); 
+      ellipse(this.pos.x, this.pos.y, this.size * 1.6);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RESIZE
+// ═══════════════════════════════════════════════════════════
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  computeWordPoints();
+  heartPoints = buildMultiLayerHeart(NUM_PARTICLES);
+  if (state === 'words') assignTargets(wordPoints[wordIndex]);
+  else if (state === 'heart') assignTargets(heartPoints);
+}
+</script>
+</body>
+</html>
+.
